@@ -1,62 +1,102 @@
-#!/usr/bin/python
-from salt import client
-from os.path import *
-import psutil
-import re
-import sys
-import shutil
+#!/usr/bin/env python
+
+from salt import client    
+from os.path import *      
+import psutil              
+import re                  
+import sys                 
+import shutil              
 import time
+from obtainfile import obtain_file
 
-class Update():
-    client = client.LocalClient()
-    date = time.strftime("%Y%m%d%H%M", time.localtime())
-    d1 = sys.argv[1]
-    d2 = sys.argv[2]
-    def web_host(self):
-        host = self.client.cmd('*', 'test.ping') 
-        return host
+client = client.LocalClient()
+date = time.strftime("%Y%m%d", time.localtime())
+time = time.strftime("%H%M%S", time.localtime())
+web_host = client.cmd('groupweb','test.ping',expr_form='nodegroup')
+#web_host = client.cmd('*','test.ping')
 
-    def zip_dir(self,hostname):
-        e = self.client.cmd(hostname, 'file.directory_exists', [self.d2])
-        e1 = (e[hostname])
-        if e1 is True:
-            gzip = self.client.cmd(hostname, 'archive.zip', ['/data/deploy/%s_%s.zip' % (self.d1,self.date),'%s/%s' % (self.d2, self.d1)])
-            print '%s/%s' % (self.d2,self.d1),'gzip to /data/deploy Success!!!!!!'
-            rn = self.client.cmd(hostname, 'file.rename', ['%s/%s' % (self.d2,self.d1), '/salt/%s-%s' % (self.d1, self.date)])
-            print '%s/%s',(self.d2,self.d1),'mv file Sucess,Please Update file',rn
-        else:
-            print self.d2,'is not exist!'
-    def copy_file(self,hostname):
-        f = self.client.cmd(hostname, 'file.file_exists',['%s/%s' % (self.d2,self.d1)])                        
-        f1 = (f[hostname])
-        if f1 is True:
-            cpfile = self.client.cmd(hostname, 'file.copy', ['%s/%s' % (self.d2,self.d1), '/data/deploy/%s_%s' % (self.d1, self.date)])
-            print '%s/%s' % (self.d2,self.d1),'cpoy to /data/deploy Sucess',cpfile
-        else:
-            print '%s/%s' %(self.d2,self.d1),'is not exist!'
-    def update_dir(self,hostname):
-        dir = self.client.cmd(hostname, 'cp.get_dir', ['salt://web_conf/%s' % self.d1, self.d2])
-        for i in dir:
-            print i
-            for i1 in (dir[i]):
-                print i1
+class Webupdate():
+    def judge_file(self,hn,fname):
+        f = client.cmd(hn,'file.file_exists',[fname])
+        t = (f[hn])
+        if t is not True:
+            k = fname.split('/')
+            del k[-1]
+            v = '/'.join(k)
+            d = client.cmd(hn,'file.directory_exists',[v])
+            i = (d[hn])
+            if i is not True:
+                mk = client.cmd(hn, 'file.mkdir', [v])
+        return 0
 
-    def update_file(self,hostname):
-        file = self.client.cmd(hostname, 'cp.get_file', ['salt://web_conf/%s' % self.d1, '%s/%s' % (self.d2,self.d1)])
-        print file
+    def judge_dir(self,hn,fname):
+        d = client.cmd(hn, 'file.directory_exists',[fname])
+        t = (d[hn])
+        if t is not True:
+            k = fname.split('/')
+            del k[-1]
+            v = '/'.join(k)
+            d = client.cmd(hn,'file.directory_exists', [v])
+            i = (d[hn])
+            if i is not True:
+                mk = client.cmd(hn, 'file.mkdir', [v])
+        return 0
+    
+    def dir_create(self,hn):
+        d = client.cmd(hn, 'file.directory_exists', ['/data/deploy/%s' % date])
+        t = (d[hn])
+        if t is not True:
+            client.cmd(hn, 'file.mkdir',['data/deploy/%s' % date])
+
+    def get_file(self,hn, fname):
+        f = client.cmd(hn, 'file.file_exists',[fname])
+        t = (f[hn])
+        if t is True:
+            k = fname.split('/')
+            fi = k[-1]
+            client.cmd(hn,'file.rename',[fname,'/data/deploy/%s/%s' % (date,fi+'-'+time)])
+        c = client.cmd(hn, 'cp.get_file', ['salt:/%s' % fname, fname])
+        print c
+
+    def get_dir(self,hn, fname):
+        f = client.cmd(hn, 'file.directory_exists',[fname])
+        t = (f[hn])
+        if t is True:
+            k = fname.split('/')
+            fi = k[-1]
+            client.cmd(hn,'file.rename',[fname,'/data/deploy/%s/%s' % (date,fi+'-'+time)])
+        fn = fname.split('/')
+        del fn[-1]
+        v = '/'.join(fn)
+        c = client.cmd(hn, 'cp.get_dir', ['salt:/%s' % fname, v])
+        print c
 
 def main():
-    p = Update()
-    for i in p.web_host():
-        if isdir('/data/salt/web_conf/%s' % sys.argv[1]):
-            p.zip_dir(i)
-            p.update_dir(i)
-
-        elif isfile('/data/salt/web_conf/%s' % sys.argv[1]):
-            p.copy_file(i)
-            p.update_file(i)
-        else:
-            print '%s file not a file or dirctory!!!' % sys.argv[1]
+    p = Webupdate()
+    if len(obtain_file()) != 0:
+        def go():
+            for f in obtain_file():
+                if isfile(f):
+                    for h in web_host:
+                        p.judge_file(h,f)
+                elif isdir(f):
+                    for h in web_host:
+                        p.judge_dir(h,f)
+            return 0
+    else:
+        print 'Not file update,Please /data/salt/python/upload!'
+    
+    if go() == 0:
+        for h in web_host:
+            p.dir_create(h)
+        
+        for f in obtain_file():
+            if isfile(f):
+                for h in web_host:
+                    p.get_file(h,f)
+            if isdir(f):
+                for h in web_host:
+                    p.get_dir(h,f)
 
 
 if __name__ == '__main__':
