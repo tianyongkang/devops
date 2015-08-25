@@ -51,7 +51,7 @@ def main():
     sp = datetime.datetime.now()
     print 'stop time', ctime()
 
-    print 'all need time(second):',int(sp) - int(sa)
+    print 'all need time(second):',sp - sa
 
 
 def lock():
