@@ -32,7 +32,7 @@ def go():
 	    postlist(url[i], eval(data_dict[i]))
 
 def main():
-    print 'start time', ctime()
+    print datetime.datetime.now()
     sa = strftime("%H%M%S", localtime()) 
     
     threads = []
@@ -48,7 +48,7 @@ def main():
     for i in nloops:
         threads[i].join()
 
-    sp = strftime("%H%M%S", localtime())
+    sp = datetime.datetime.now()
     print 'stop time', ctime()
 
     print 'all need time(second):',int(sp) - int(sa)
