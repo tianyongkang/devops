@@ -1,0 +1,5 @@
+进入到对应虚拟机的目录
+ cd /var/lib/nova/instances/f91f0fea-56de-463b-8ef1-d468a72751dd
+增大硬盘
+qemu-img resize +100G disk
+qemu-img resize disk +22G
