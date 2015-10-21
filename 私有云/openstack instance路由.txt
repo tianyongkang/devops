@@ -1,0 +1,6 @@
+route add  -net 172.20.0.0/24  gw 172.17.0.1
+route add default gateway 172.16.0.1
+route del default gateway 172.17.0.1
+
+
+route add  -net 122.226.100.144/28  gw 172.16.0.1
